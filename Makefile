@@ -1,6 +1,6 @@
 BIN := main
-SOURCES := main.c
-HEADERS := main.h
+SOURCES := main.c list.c
+HEADERS := main.h list.h
 CFLAGS := -g
 LDFLAGS := -lrt -pthread
 

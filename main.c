@@ -1,5 +1,5 @@
 #include "main.h"
-
+#define NUMOFTREAD 10
 /*
     1. прямое создание форка при подключении и переключение клиента на него
     2. создание пула заранее и сообщение эндпоинта клиенту
@@ -7,17 +7,53 @@
     заявки в очередь. потоки изымают заявку из очереди и отвечают клиенту. 
 */
 
+sem_t lock;
+
+void* receiver(void* argc){
+    char buffer[1024];
+    int sd = 0;
+    while(1){
+        list* tmp;
+        while(1){
+            sem_wait(&lock);
+            if(tmp = getAt(0)) {
+                sd = tmp->bk.sockdes;
+                remove_at(0);
+                sem_post(&lock);
+                break;
+            }   
+            sem_post(&lock);
+        }
+        printf("take in work [%d]\n", sd);
+        while(sd){
+            for(int i = 0; i < sizeof buffer; i++){
+                buffer[i] = 0;
+            }
+            if(read(sd, buffer, 1024) < 0){
+                perror("read");
+                break;
+            }
+            //printf("%s\n", buffer);
+            strcat(buffer, "+ ");
+            if(send(sd, buffer, strlen(buffer), 0) < 0){
+                perror("send");
+                break;
+            }
+        }
+        printf("[%d]: socket closed\n", sd);
+        close(sd);
+    }    
+}
+
 //setrlimit
 
 int main(int argc, char* argv[]){
-
+    pthread_t thrd[NUMOFTREAD];
     int server_fd, new_socket;
-    char state = 0 ;
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
     char buffer[1024] = { 0 };
-
 
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(server_fd < 0){
@@ -32,48 +68,33 @@ int main(int argc, char* argv[]){
 
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = inet_addr("192.168.0.136");
-    address.sin_port = htons(8080);
+    address.sin_port = htons(8090);
 
     if(bind(server_fd, (struct sockaddr*)&address, sizeof(address)) < 0){
         perror("bind failed");
         exit(EXIT_FAILURE);
     }
 
-    pid_t newfork;
-    int i = 0; 
-    while(newfork){
-        printf("created %d\n", i);
-        if(i++ == 2) //nums of pool + 1
-            break;
-        newfork = fork();       
+    sem_init(&lock, 0, 1);
+
+    for(int i = 0; i < NUMOFTREAD; i++){
+        pthread_create(&thrd[i], NULL, receiver, NULL);
     }
 
     if(listen(server_fd, 3) < 0){
         perror("listen");
         exit(EXIT_FAILURE);
     }
+
+    //автомат принятия заявок
     
-    if((new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) < 0){
+    while(1){
+        book bk = {0};
+        if((bk.sockdes = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) < 0){
             perror("accept");
             exit(EXIT_FAILURE);
         }
-        //printf("connected %d\n", new_socket);
-    while(1){
-        for(int i = 0; i < sizeof buffer; i++){
-            buffer[i] = 0;
-        }
-        if(read(new_socket, buffer, 1024) < 0){
-            perror("read");
-            break;
-        }
-        printf("%s\n", buffer);
-        strcat(buffer, "+ ");
-        if(send(new_socket, buffer, strlen(buffer), 0) < 0){
-            perror("send");
-            break;
-        }
-    }
-    printf("[%d]: socket closed", new_socket);
-    close(new_socket);
+        pushBack(&bk);
+    }    
     return 0;
 }
