@@ -11,7 +11,7 @@
 
 int main(int argc, char* argv[]){
 
-    int server_fd, new_socket, valread;
+    int server_fd, new_socket;
     char state = 0 ;
     struct sockaddr_in address;
     int opt = 1;
@@ -39,31 +39,41 @@ int main(int argc, char* argv[]){
         exit(EXIT_FAILURE);
     }
 
+    pid_t newfork;
+    int i = 0; 
+    while(newfork){
+        printf("created %d\n", i);
+        if(i++ == 2) //nums of pool + 1
+            break;
+        newfork = fork();       
+    }
+
     if(listen(server_fd, 3) < 0){
         perror("listen");
         exit(EXIT_FAILURE);
     }
-
-    pid_t newfork;
-
-    while(newfork){
-        if((new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) < 0){
+    
+    if((new_socket = accept(server_fd, (struct sockaddr*)&address, (socklen_t*)&addrlen)) < 0){
             perror("accept");
             exit(EXIT_FAILURE);
         }
-        newfork = fork();
-    }
+        //printf("connected %d\n", new_socket);
     while(1){
         for(int i = 0; i < sizeof buffer; i++){
             buffer[i] = 0;
         }
-        valread = read(new_socket, buffer, 1024);
-        printf("[%d]:%s\n",new_socket, buffer);
+        if(read(new_socket, buffer, 1024) < 0){
+            perror("read");
+            break;
+        }
+        printf("%s\n", buffer);
         strcat(buffer, "+ ");
-        send(new_socket, buffer, strlen(buffer), 0);
-        
+        if(send(new_socket, buffer, strlen(buffer), 0) < 0){
+            perror("send");
+            break;
+        }
     }
+    printf("[%d]: socket closed", new_socket);
     close(new_socket);
     return 0;
-
 }
