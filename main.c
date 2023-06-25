@@ -1,5 +1,5 @@
 #include "main.h"
-#define NUMOFTREAD 10
+#define NUMOFTREAD 2
 /*
     1. прямое создание форка при подключении и переключение клиента на него
     2. создание пула заранее и сообщение эндпоинта клиенту
@@ -13,6 +13,7 @@ void* receiver(void* argc){
     char buffer[1024];
     int sd = 0;
     while(1){
+        sd = 0;
         list* tmp;
         while(1){
             sem_wait(&lock);
@@ -24,23 +25,26 @@ void* receiver(void* argc){
             }   
             sem_post(&lock);
         }
-        printf("take in work [%d]\n", sd);
         while(sd){
             for(int i = 0; i < sizeof buffer; i++){
                 buffer[i] = 0;
             }
-            if(read(sd, buffer, 1024) < 0){
+            ssize_t sz = read(sd, buffer, 1024);
+            if(sz < 0){
                 perror("read");
                 break;
             }
-            //printf("%s\n", buffer);
+            else if(sz == 0){ //костыль
+                perror("read");
+                break;
+            }
             strcat(buffer, "+ ");
             if(send(sd, buffer, strlen(buffer), 0) < 0){
                 perror("send");
                 break;
             }
         }
-        printf("[%d]: socket closed\n", sd);
+        shutdown(sd, SHUT_RDWR);
         close(sd);
     }    
 }
