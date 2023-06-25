@@ -11,7 +11,7 @@ sem_t lock;
 
 void* receiver(void* argc){
     char buffer[1024];
-    int sd = 0;
+    int sd;
     while(1){
         sd = 0;
         list* tmp;
@@ -57,10 +57,8 @@ int main(int argc, char* argv[]){
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
-    char buffer[1024] = { 0 };
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(server_fd < 0){
+    if((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
         perror("socket not opened");
         exit(EXIT_FAILURE);
     }
@@ -89,8 +87,6 @@ int main(int argc, char* argv[]){
         perror("listen");
         exit(EXIT_FAILURE);
     }
-
-    //автомат принятия заявок
     
     while(1){
         book bk = {0};
